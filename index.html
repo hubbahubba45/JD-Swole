@@ -60,25 +60,64 @@
             transform-origin: center;
             animation: rotate 0.5s linear infinite;
         }
-        .explosion {
+        .small-explosion {
             position: absolute;
-            width: 100px;
-            height: 100px;
-            background: radial-gradient(circle, rgba(255,165,0,1) 0%, rgba(255,69,0,0.5) 50%, rgba(255,0,0,0) 100%);
             border-radius: 50%;
-            opacity: 0.7;
+            background: radial-gradient(
+                circle, 
+                rgba(255,165,0,1) 0%, 
+                rgba(255,69,0,0.7) 50%, 
+                rgba(255,0,0,0) 100%
+            );
+            opacity: 0.8;
             z-index: 15;
             transform: translate(-50%, -50%);
             pointer-events: none;
+            animation: explode 0.5s ease-out;
+        }
+        .massive-explosion {
+            position: absolute;
+            width: 200vw;
+            height: 200vh;
+            background: radial-gradient(
+                circle, 
+                rgba(255,0,0,1) 0%, 
+                rgba(255,165,0,0.8) 30%, 
+                rgba(255,69,0,0.5) 60%, 
+                rgba(0,0,0,0) 100%
+            );
+            border-radius: 50%;
+            opacity: 0.9;
+            z-index: 100;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            animation: massiveExplode 1s ease-out;
         }
         @keyframes rotate {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+        @keyframes explode {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+        }
+        @keyframes massiveExplode {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+        }
         #scoreBoard {
             position: absolute;
             top: 10px;
             left: 10px;
+            font-size: 4vmin;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 20;
+        }
+        #difficultyBoard {
+            position: absolute;
+            top: 10px;
+            right: 10px;
             font-size: 4vmin;
             color: white;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
@@ -113,6 +152,7 @@
 <body>
     <div id="gameContainer">
         <div id="scoreBoard">Bombs Destroyed: 0</div>
+        <div id="difficultyBoard">Difficulty: 1</div>
         <img id="murica" src="murica.png" alt="America">
         <img id="swole" src="Swole.png" alt="Swole Character">
         <div id="gameOver">
@@ -129,6 +169,7 @@
         const swole = document.getElementById('swole');
         const murica = document.getElementById('murica');
         const scoreBoard = document.getElementById('scoreBoard');
+        const difficultyBoard = document.getElementById('difficultyBoard');
         const gameOverDisplay = document.getElementById('gameOver');
         const playAgainBtn = document.getElementById('playAgainBtn');
 
@@ -136,7 +177,9 @@
             constructor() {
                 this.score = 0;
                 this.gameActive = false;
-                this.bombSpeed = 7; // Increased bomb speed
+                this.bombSpeed = 5;
+                this.difficulty = 1;
+                this.bombGenerationInterval = 1000;
                 this.bombs = [];
                 this.bombGenerator = null;
 
@@ -156,18 +199,37 @@
                 // Clear any existing state
                 this.gameActive = true;
                 this.score = 0;
-                this.bombSpeed = 7;
+                this.bombSpeed = 5;
+                this.difficulty = 1;
+                this.bombGenerationInterval = 1000;
                 this.bombs = [];
 
                 // Reset display
                 scoreBoard.textContent = 'Bombs Destroyed: 0';
+                difficultyBoard.textContent = 'Difficulty: 1';
                 gameOverDisplay.style.display = 'none';
 
                 // Remove any existing elements
-                document.querySelectorAll('.bomb, .candy, .explosion').forEach(el => el.remove());
+                document.querySelectorAll('.bomb, .candy, .small-explosion, .massive-explosion').forEach(el => el.remove());
 
                 // Start bomb generation
-                this.bombGenerator = setInterval(() => this.createBomb(), 1000);
+                this.bombGenerator = setInterval(() => this.createBomb(), this.bombGenerationInterval);
+
+                // Start difficulty increase timer
+                this.difficultyTimer = setInterval(() => this.increaseDifficulty(), 15000);
+            }
+
+            increaseDifficulty() {
+                this.difficulty++;
+                this.bombSpeed += 1;
+                this.bombGenerationInterval = Math.max(300, this.bombGenerationInterval - 100);
+                
+                // Clear and restart bomb generator with new interval
+                clearInterval(this.bombGenerator);
+                this.bombGenerator = setInterval(() => this.createBomb(), this.bombGenerationInterval);
+                
+                // Update difficulty display
+                difficultyBoard.textContent = `Difficulty: ${this.difficulty}`;
             }
 
             createBomb() {
@@ -198,7 +260,7 @@
                     const mucicaRect = murica.getBoundingClientRect();
                     const bombRect = bomb.getBoundingClientRect();
                     if (bombRect.bottom >= mucicaRect.top) {
-                        this.endGame(bomb);
+                        this.endGame(bomb, true);
                         return;
                     }
                 };
@@ -236,6 +298,9 @@
                             // Clear bomb's movement interval
                             clearInterval(bomb.dataset.interval);
                             
+                            // Create small explosion
+                            this.createSmallExplosion(bomb.offsetLeft, bomb.offsetTop);
+                            
                             // Mark for removal
                             bombsToRemove.push(index);
                             bomb.remove();
@@ -254,6 +319,20 @@
                 }, 500);
             }
 
+            createSmallExplosion(x, y) {
+                const explosion = document.createElement('div');
+                explosion.classList.add('small-explosion');
+                explosion.style.left = `${x}px`;
+                explosion.style.top = `${y}px`;
+                explosion.style.width = '50px';
+                explosion.style.height = '50px';
+                gameContainer.appendChild(explosion);
+
+                setTimeout(() => {
+                    explosion.remove();
+                }, 500);
+            }
+
             isColliding(a, b) {
                 const aRect = a.getBoundingClientRect();
                 const bRect = b.getBoundingClientRect();
@@ -266,11 +345,12 @@
                 );
             }
 
-            endGame(bomb) {
+            endGame(bomb, massiveExplosion = false) {
                 if (!this.gameActive) return;
 
                 this.gameActive = false;
                 clearInterval(this.bombGenerator);
+                clearInterval(this.difficultyTimer);
 
                 // Clear all bomb intervals
                 this.bombs.forEach(b => clearInterval(b.dataset.interval));
@@ -280,22 +360,26 @@
                 this.bombs = [];
 
                 // Create explosion
-                this.createExplosion(bomb.offsetLeft, bomb.offsetTop);
+                if (massiveExplosion) {
+                    this.createMassiveExplosion(gameContainer.offsetWidth / 2, gameContainer.offsetHeight / 2);
+                } else {
+                    this.createSmallExplosion(bomb.offsetLeft, bomb.offsetTop);
+                }
 
                 // Show game over screen
                 gameOverDisplay.style.display = 'block';
             }
 
-            createExplosion(x, y) {
+            createMassiveExplosion(x, y) {
                 const explosion = document.createElement('div');
-                explosion.classList.add('explosion');
+                explosion.classList.add('massive-explosion');
                 explosion.style.left = `${x}px`;
                 explosion.style.top = `${y}px`;
                 gameContainer.appendChild(explosion);
 
                 setTimeout(() => {
                     explosion.remove();
-                }, 500);
+                }, 1000);
             }
         }
 
